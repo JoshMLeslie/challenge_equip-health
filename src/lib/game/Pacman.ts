@@ -1,45 +1,54 @@
+/* eslint-disable lines-between-class-members */
 import {
   GameBoardItemType,
   GameDirection,
   GameDirectionMap,
-  GameDirectionToKeys,
   pillMax,
 } from '../Map';
 import Item from './Item';
 
+const moveTo = (possibleMoves: GameBoardItemMove[]) => possibleMoves[Math.round(Math.random() * (possibleMoves.length - 1))];
 class Pacman extends Item implements GameBoardItem {
   type: GameBoardItemType = GameBoardItemType.PACMAN;
-
-  desiredMove: string | false = false;
-
+  lastPos: GameBoardItemMove['piece']['id'] | undefined;
   score: number = 0;
 
-  /**
-   * Returns the next move
-   */
-  getNextMove(): GameBoardItemMove | boolean {
+  getNextMove(): GameBoardItemMove | false {
     const { moves } = this.piece;
-    let move: GameBoardItemMove | false = false;
+    let possibleMoves: GameBoardItemMove[] = [];
 
-    // If there is a keyboard move, use it and clear it
-    if (this.desiredMove) {
-      if (moves[this.desiredMove]) {
-        move = {
-          piece: moves[this.desiredMove],
-          direction: GameDirectionMap[this.desiredMove],
-        };
-        this.desiredMove = false;
+    for (const idx in moves) {
+      if (!idx) {
+        continue; // eslint-disable-line no-continue
+      }
+      const idxMove = { piece: moves[idx], direction: GameDirectionMap[idx] };
+
+      // in the current direction, if no ghost, add to possible moves
+      const foundGhost = this.findItem(idx, GameBoardItemType.GHOST);
+      if (!foundGhost) {
+        possibleMoves.push(idxMove);
+      } else if (foundGhost && this.pillTimer?.timer > 0) {
+        // if a ghost is found, pursue it
+        possibleMoves = [idxMove];
+        break;
       }
     }
 
-    // Otherwise, continue in the last direction
-    if (!move && this.direction !== GameDirection.NONE) {
-      const key = GameDirectionToKeys(this.direction);
-      if (moves[key]) {
-        move = { piece: moves[key], direction: this.direction };
-      }
+    if (!possibleMoves.length) {
+      return false;
     }
 
+    let move = possibleMoves.pop() as GameBoardItemMove;
+    const pos = move.piece.id;
+    if (!this.lastPos) {
+      // necessary for the init condition
+      this.lastPos = pos;
+      return move;
+    }
+    if (pos === this.lastPos) {
+      move = moveTo(possibleMoves);
+    }
+    this.lastPos = move.piece.id;
     return move;
   }
 
